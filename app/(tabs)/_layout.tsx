@@ -30,8 +30,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Tab One",
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: "Music Library",
+          tabBarIcon: ({ color }) => <TabBarIcon name="music" color={color} />,
           headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable>
@@ -45,6 +45,22 @@ export default function TabLayout() {
                 )}
               </Pressable>
             </Link>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="Favorites"
+        options={{
+          title: "Favorites",
+          tabBarIcon: ({ color }) => <TabBarIcon name="heart" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="MusicPlayer"
+        options={{
+          title: "Now Playing",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="play-circle" color={color} />
           ),
         }}
       />

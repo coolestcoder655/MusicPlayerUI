@@ -8,34 +8,66 @@ import {
   Dimensions,
   StatusBar,
   SafeAreaView,
+  FlatList,
+  Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Slider from "@react-native-community/slider";
 import Icon from "react-native-vector-icons/Feather";
-import { songs, getCurrentSong, Song } from "../../constants/Songs";
+import { songs, Song } from "../../constants/Songs";
+import { useMusicContext } from "@/context/MusicContext";
+import { router } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
 const MusicPlayer = () => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(137);
-  const [duration, setDuration] = useState(243);
-  const [volume, setVolume] = useState(0.75);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isShuffled, setIsShuffled] = useState(false);
-  const [repeatMode, setRepeatMode] = useState(0); // 0: off, 1: all, 2: one
-  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const {
+    currentSong,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    playlist,
+    currentIndex,
+    isShuffled,
+    repeatMode,
+    upNext,
+    sound,
+    setIsPlaying,
+    setCurrentTime,
+    setVolume,
+    setIsShuffled,
+    setRepeatMode,
+    playNext,
+    playPrevious,
+    togglePlayPause,
+    syncDeviceVolume,
+    toggleFavorite,
+    isFavorite,
+    addToUpNext,
+    removeFromUpNext,
+    clearUpNext,
+  } = useMusicContext();
 
-  const currentSong = songs[currentSongIndex];
+  const [showUpNext, setShowUpNext] = useState(false);
+
+  // Sync device volume on mount
+  useEffect(() => {
+    syncDeviceVolume();
+  }, []);
+
+  // Use the current song from context, fallback to first song if none selected
+  const displaySong = currentSong || songs[0];
+
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
-    if (isPlaying && currentTime < currentSong.duration) {
+    if (isPlaying && currentTime < displaySong.duration) {
       interval = setInterval(() => {
-        setCurrentTime((prev) => Math.min(prev + 1, currentSong.duration));
+        setCurrentTime(Math.min(currentTime + 1, displaySong.duration));
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, currentTime, currentSong.duration]);
+  }, [isPlaying, currentTime, displaySong.duration]);
 
   interface FormatTime {
     (seconds: number): string;
@@ -48,31 +80,25 @@ const MusicPlayer = () => {
   };
 
   const toggleRepeat = () => {
-    setRepeatMode((prev) => (prev + 1) % 3);
+    if (repeatMode === "none") {
+      setRepeatMode("all");
+    } else if (repeatMode === "all") {
+      setRepeatMode("one");
+    } else {
+      setRepeatMode("none");
+    }
   };
+
+  const handleSeek = async (value: number) => {
+    setCurrentTime(value);
+    if (sound) {
+      await sound.setPositionAsync(value * 1000); // Convert to milliseconds
+    }
+  };
+
   const getRepeatIcon = () => {
-    if (repeatMode === 2) return "repeat";
+    if (repeatMode === "one") return "repeat";
     return "repeat";
-  };
-
-  const playNext = () => {
-    if (isShuffled) {
-      const randomIndex = Math.floor(Math.random() * songs.length);
-      setCurrentSongIndex(randomIndex);
-    } else {
-      setCurrentSongIndex((prev) => (prev + 1) % songs.length);
-    }
-    setCurrentTime(0);
-  };
-
-  const playPrevious = () => {
-    if (isShuffled) {
-      const randomIndex = Math.floor(Math.random() * songs.length);
-      setCurrentSongIndex(randomIndex);
-    } else {
-      setCurrentSongIndex((prev) => (prev - 1 + songs.length) % songs.length);
-    }
-    setCurrentTime(0);
   };
 
   return (
@@ -91,136 +117,240 @@ const MusicPlayer = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>NOW PLAYING</Text>
+          <Text style={styles.headerText}>
+            {currentSong ? "NOW PLAYING" : "SELECT A SONG"}
+          </Text>
         </View>
 
-        {/* Album Art Section */}
-        <View style={styles.albumSection}>
-          <View style={styles.albumArtContainer}>
-            <Image
-              source={{ uri: currentSong.cover }}
-              style={styles.albumArt}
-              resizeMode="cover"
-            />
-          </View>
-        </View>
+        {currentSong ? (
+          <>
+            {/* Album Art Section */}
+            <View style={styles.albumSection}>
+              <View style={styles.albumArtContainer}>
+                <Image
+                  source={{ uri: displaySong.cover }}
+                  style={styles.albumArt}
+                  resizeMode="cover"
+                />
+              </View>
+            </View>
 
-        {/* Song Info */}
-        <View style={styles.songInfo}>
-          <Text style={styles.songTitle}>{currentSong.title}</Text>
-          <Text style={styles.artistName}>{currentSong.artist}</Text>
-          <Text style={styles.albumName}>{currentSong.album}</Text>
-        </View>
-
-        {/* Progress Section */}
-        <View style={styles.progressSection}>
-          {" "}
-          <Slider
-            style={styles.progressSlider}
-            minimumValue={0}
-            maximumValue={currentSong.duration}
-            value={currentTime}
-            onValueChange={setCurrentTime}
-            minimumTrackTintColor="#FFFFFF"
-            maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-          />
-          <View style={styles.timeContainer}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            <Text style={styles.timeText}>
-              {formatTime(currentSong.duration)}
+            {/* Song Info */}
+            <View style={styles.songInfo}>
+              <Text style={styles.songTitle}>{displaySong.title}</Text>
+              <Text style={styles.artistName}>{displaySong.artist}</Text>
+              <Text style={styles.albumName}>{displaySong.album}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.noSongContainer}>
+            <Icon name="music" size={80} color="rgba(255, 255, 255, 0.3)" />
+            <Text style={styles.noSongText}>
+              Go to the Music Library tab to select a song
             </Text>
           </View>
-        </View>
+        )}
 
-        {/* Main Controls */}
-        <View style={styles.mainControls}>
-          <TouchableOpacity
-            onPress={() => setIsShuffled(!isShuffled)}
-            style={[styles.controlButton, isShuffled && styles.activeButton]}
-          >
-            <Icon
-              name="shuffle"
-              size={24}
-              color={isShuffled ? "#10b981" : "rgba(255, 255, 255, 0.7)"}
-            />
-          </TouchableOpacity>{" "}
-          <TouchableOpacity style={styles.controlButton} onPress={playPrevious}>
-            <Icon name="skip-back" size={32} color="rgba(255, 255, 255, 0.9)" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setIsPlaying(!isPlaying)}
-            style={styles.playButton}
-          >
-            <Icon
-              name={isPlaying ? "pause" : "play"}
-              size={32}
-              color="#000000"
-              style={!isPlaying && { marginLeft: 3 }}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.controlButton} onPress={playNext}>
-            <Icon
-              name="skip-forward"
-              size={32}
-              color="rgba(255, 255, 255, 0.9)"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={toggleRepeat}
-            style={[
-              styles.controlButton,
-              repeatMode > 0 && styles.activeButton,
-            ]}
-          >
-            <Icon
-              name={getRepeatIcon()}
-              size={24}
-              color={repeatMode > 0 ? "#10b981" : "rgba(255, 255, 255, 0.7)"}
-            />
-            {repeatMode === 2 && (
-              <View style={styles.repeatBadge}>
-                <Text style={styles.repeatBadgeText}>1</Text>
+        {currentSong && (
+          <>
+            {/* Progress Section */}
+            <View style={styles.progressSection}>
+              {" "}
+              <Slider
+                style={styles.progressSlider}
+                minimumValue={0}
+                maximumValue={displaySong.duration}
+                value={currentTime}
+                onValueChange={handleSeek}
+                minimumTrackTintColor="#FFFFFF"
+                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+              />
+              <View style={styles.timeContainer}>
+                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                <Text style={styles.timeText}>
+                  {formatTime(displaySong.duration)}
+                </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        </View>
+            </View>
 
-        {/* Secondary Controls */}
-        <View style={styles.secondaryControls}>
-          <TouchableOpacity
-            onPress={() => setIsLiked(!isLiked)}
-            style={styles.secondaryButton}
-          >
-            <Icon
-              name="heart"
-              size={24}
-              color={isLiked ? "#ef4444" : "rgba(255, 255, 255, 0.7)"}
-            />
-          </TouchableOpacity>
+            {/* Main Controls */}
+            <View style={styles.mainControls}>
+              <TouchableOpacity
+                onPress={() => setIsShuffled(!isShuffled)}
+                style={[
+                  styles.controlButton,
+                  isShuffled && styles.activeButton,
+                ]}
+              >
+                <Icon
+                  name="shuffle"
+                  size={24}
+                  color={isShuffled ? "#10b981" : "rgba(255, 255, 255, 0.7)"}
+                />
+              </TouchableOpacity>{" "}
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={playPrevious}
+              >
+                <Icon
+                  name="skip-back"
+                  size={32}
+                  color="rgba(255, 255, 255, 0.9)"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={togglePlayPause}
+                style={styles.playButton}
+              >
+                <Icon
+                  name={isPlaying ? "pause" : "play"}
+                  size={32}
+                  color="#000000"
+                  style={!isPlaying && { marginLeft: 3 }}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.controlButton} onPress={playNext}>
+                <Icon
+                  name="skip-forward"
+                  size={32}
+                  color="rgba(255, 255, 255, 0.9)"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={toggleRepeat}
+                style={[
+                  styles.controlButton,
+                  repeatMode !== "none" && styles.activeButton,
+                ]}
+              >
+                <Icon
+                  name={getRepeatIcon()}
+                  size={24}
+                  color={
+                    repeatMode !== "none"
+                      ? "#10b981"
+                      : "rgba(255, 255, 255, 0.7)"
+                  }
+                />
+                {repeatMode === "one" && (
+                  <View style={styles.repeatBadge}>
+                    <Text style={styles.repeatBadgeText}>1</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.volumeContainer}>
-            <Icon name="volume-2" size={20} color="rgba(255, 255, 255, 0.7)" />
-            <Slider
-              style={styles.volumeSlider}
-              minimumValue={0}
-              maximumValue={1}
-              value={volume}
-              onValueChange={setVolume}
-              minimumTrackTintColor="#FFFFFF"
-              maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-            />
-            <Text style={styles.volumeText}>{Math.round(volume * 100)}</Text>
+            {/* Secondary Controls */}
+            <View style={styles.secondaryControls}>
+              <TouchableOpacity
+                onPress={() => currentSong && toggleFavorite(currentSong.id)}
+                style={styles.secondaryButton}
+              >
+                <Icon
+                  name="heart"
+                  size={24}
+                  color={
+                    currentSong && isFavorite(currentSong.id)
+                      ? "#ef4444"
+                      : "rgba(255, 255, 255, 0.7)"
+                  }
+                />
+              </TouchableOpacity>
+
+              <View style={styles.volumeContainer}>
+                <Icon
+                  name="volume-2"
+                  size={20}
+                  color="rgba(255, 255, 255, 0.7)"
+                />
+                <Slider
+                  style={styles.volumeSlider}
+                  minimumValue={0}
+                  maximumValue={1}
+                  value={volume}
+                  onValueChange={setVolume}
+                  minimumTrackTintColor="#FFFFFF"
+                  maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                />
+                <Text style={styles.volumeText}>
+                  {Math.round(volume * 100)}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => setShowUpNext(true)}
+              >
+                <Icon name="list" size={24} color="rgba(255, 255, 255, 0.7)" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </LinearGradient>
+
+      {/* Up Next Modal */}
+      <Modal
+        visible={showUpNext}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowUpNext(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Up Next</Text>
+            <View style={styles.modalHeaderButtons}>
+              {upNext.length > 0 && (
+                <TouchableOpacity
+                  onPress={clearUpNext}
+                  style={styles.clearButton}
+                >
+                  <Text style={styles.clearButtonText}>Clear</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => setShowUpNext(false)}
+                style={styles.closeButton}
+              >
+                <Icon name="x" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Icon
-              name="more-horizontal"
-              size={24}
-              color="rgba(255, 255, 255, 0.7)"
+          {upNext.length === 0 ? (
+            <View style={styles.emptyUpNext}>
+              <Icon name="music" size={60} color="rgba(0, 0, 0, 0.3)" />
+              <Text style={styles.emptyUpNextText}>
+                No songs in queue. Add songs from the music library!
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={upNext}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              renderItem={({ item, index }) => (
+                <View style={styles.upNextItem}>
+                  <Text style={styles.upNextIndex}>{index + 1}</Text>
+                  <Image
+                    source={{ uri: item.cover }}
+                    style={styles.upNextCover}
+                  />
+                  <View style={styles.upNextInfo}>
+                    <Text style={styles.upNextTitle}>{item.title}</Text>
+                    <Text style={styles.upNextArtist}>{item.artist}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => removeFromUpNext(index)}
+                    style={styles.removeButton}
+                  >
+                    <Icon name="x" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              style={styles.upNextList}
             />
-          </TouchableOpacity>
+          )}
         </View>
-      </LinearGradient>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -236,8 +366,8 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    paddingTop: 32,
-    paddingBottom: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   headerText: {
     color: "rgba(255, 255, 255, 0.8)",
@@ -247,50 +377,64 @@ const styles = StyleSheet.create({
   },
   albumSection: {
     alignItems: "center",
-    paddingVertical: 32,
+    paddingVertical: 16,
   },
   albumArtContainer: {
-    width: width * 0.75,
-    height: width * 0.75,
-    borderRadius: 24,
+    width: width * 0.2,
+    height: width * 0.2,
+    borderRadius: 18,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 20,
+      height: 12,
     },
-    shadowOpacity: 0.5,
-    shadowRadius: 25,
-    elevation: 20,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   albumArt: {
     width: "100%",
     height: "100%",
-    borderRadius: 24,
+    borderRadius: 18,
   },
   songInfo: {
     alignItems: "center",
-    paddingBottom: 32,
+    paddingBottom: 20,
+    paddingTop: 12,
+  },
+  noSongContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  noSongText: {
+    color: "rgba(255, 255, 255, 0.6)",
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 20,
+    paddingHorizontal: 40,
   },
   songTitle: {
     color: "#FFFFFF",
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: "center",
   },
   artistName: {
     color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 20,
-    marginBottom: 4,
+    fontSize: 16,
+    marginBottom: 2,
     textAlign: "center",
   },
   albumName: {
     color: "rgba(255, 255, 255, 0.6)",
-    fontSize: 16,
+    fontSize: 13,
     textAlign: "center",
   },
   progressSection: {
-    paddingBottom: 32,
+    paddingBottom: 20,
   },
   progressSlider: {
     width: "100%",
@@ -314,7 +458,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   controlButton: {
     padding: 12,
@@ -359,7 +503,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingBottom: 32,
+    paddingBottom: 20,
   },
   secondaryButton: {
     padding: 12,
@@ -387,6 +531,94 @@ const styles = StyleSheet.create({
     fontSize: 12,
     width: 24,
     textAlign: "right",
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  modalHeaderButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  clearButton: {
+    backgroundColor: "#ff4444",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  clearButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  closeButton: {
+    padding: 8,
+  },
+  emptyUpNext: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyUpNextText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 16,
+    paddingHorizontal: 32,
+  },
+  upNextList: {
+    flex: 1,
+  },
+  upNextItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  upNextIndex: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+    width: 24,
+    marginRight: 12,
+  },
+  upNextCover: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  upNextInfo: {
+    flex: 1,
+  },
+  upNextTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 2,
+  },
+  upNextArtist: {
+    fontSize: 14,
+    color: "#666",
+  },
+  removeButton: {
+    padding: 8,
   },
 });
 

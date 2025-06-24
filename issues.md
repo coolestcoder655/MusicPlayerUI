@@ -1,0 +1,3 @@
+- [ ] "Text strings must be rendered in a <Text> Component"
+- [ ] The scroll bar has the gianormous decimals when you try seeking like (1.84372473298743274932748)
+- [ ] The volume still is not linked to the native volume.

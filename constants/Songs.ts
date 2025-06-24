@@ -5,6 +5,7 @@ export interface Song {
   album: string;
   cover: string;
   duration: number;
+  audio?: string; // Optional property for audio URL
 }
 
 export const songs: Song[] = [
@@ -13,46 +14,44 @@ export const songs: Song[] = [
     title: "Blinding Lights",
     artist: "The Weeknd",
     album: "After Hours",
-    cover: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop&crop=center",
-    duration: 243
+    cover: "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png",
+    duration: 243,
+    audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//BlindingLights.mp3",
   },
   {
     id: "2",
     title: "Watermelon Sugar",
     artist: "Harry Styles",
     album: "Fine Line",
-    cover: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop&crop=center",
-    duration: 174
+    cover: "https://upload.wikimedia.org/wikipedia/en/b/bf/Watermelon_Sugar_-_Harry_Styles.png",
+    duration: 174,
+    audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//WatermelonSugar.mp3",
   },
   {
     id: "3",
     title: "Good 4 U",
     artist: "Olivia Rodrigo",
     album: "SOUR",
-    cover: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300&h=300&fit=crop&crop=center",
-    duration: 178
+    cover: "https://upload.wikimedia.org/wikipedia/en/3/3e/Olivia_Rodrigo_-_Good_4_U.png",
+    duration: 178,
+    audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//Good4U.mp3",
   },
   {
     id: "4",
     title: "Levitating",
     artist: "Dua Lipa",
     album: "Future Nostalgia",
-    cover: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=300&h=300&fit=crop&crop=center",
-    duration: 203
+    cover: "https://upload.wikimedia.org/wikipedia/en/3/3d/Dua_Lipa_Levitating_%28DaBaby_Remix%29.png",
+    duration: 203,
+    audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//Levitating.mp3",
   },
   {
     id: "5",
     title: "Anti-Hero",
     artist: "Taylor Swift",
     album: "Midnights",
-    cover: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop&crop=center",
-    duration: 200
-  }
+    cover: "https://upload.wikimedia.org/wikipedia/en/b/b9/Taylor_Swift_-_Anti-Hero.png",
+    duration: 200,
+    audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//AntiHero.mp3",
+  },
 ];
-
-export const getCurrentSong = (id?: string): Song => {
-  if (id) {
-    return songs.find(song => song.id === id) || songs[0];
-  }
-  return songs[0];
-};

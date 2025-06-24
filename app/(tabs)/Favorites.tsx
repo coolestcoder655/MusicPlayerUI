@@ -9,25 +9,27 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
 
-import EditScreenInfo from "@/components/EditScreenInfo";
 import { Text, View } from "@/components/Themed";
-import { songs, Song } from "@/constants/Songs";
+import { Song } from "@/constants/Songs";
 import { useMusicContext } from "@/context/MusicContext";
 
-const TabOneScreen = () => {
+const FavoritesScreen = () => {
   const {
     currentSong,
     setPlaylist,
     playSongFromPlaylist,
     openMusicPlayer,
     isPlaying,
-    addToUpNext,
+    getFavoriteSongs,
     toggleFavorite,
     isFavorite,
+    addToUpNext,
   } = useMusicContext();
 
   const [showMenu, setShowMenu] = useState(false);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+
+  const favoriteSongs = getFavoriteSongs();
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -36,11 +38,11 @@ const TabOneScreen = () => {
   };
 
   const handleSongPress = (song: Song, index: number) => {
-    // Set the current playlist to all songs
-    setPlaylist(songs);
+    // Set the current playlist to favorite songs
+    setPlaylist(favoriteSongs);
     // Play the selected song
     playSongFromPlaylist(index);
-    // Open the music player modal
+    // Open the music player
     openMusicPlayer();
   };
 
@@ -60,13 +62,12 @@ const TabOneScreen = () => {
     setShowMenu(false);
   };
 
-  const handleToggleFavorite = () => {
+  const handleRemoveFromFavorites = () => {
     if (selectedSong) {
       toggleFavorite(selectedSong.id);
-      const action = isFavorite(selectedSong.id) ? "removed from" : "added to";
       Alert.alert(
-        "Favorites Updated",
-        `"${selectedSong.title}" has been ${action} favorites`
+        "Removed from Favorites",
+        `"${selectedSong.title}" has been removed from favorites`
       );
     }
     setShowMenu(false);
@@ -91,6 +92,16 @@ const TabOneScreen = () => {
           <Text style={styles.albumName}>{item.album}</Text>
         </View>
         <Text style={styles.duration}>{formatDuration(item.duration)}</Text>
+        <TouchableOpacity
+          onPress={() => handleMenuPress(item)}
+          style={styles.menuButton}
+        >
+          <Icon
+            name="more-horizontal"
+            size={20}
+            color="rgba(255, 255, 255, 0.7)"
+          />
+        </TouchableOpacity>
         {isCurrentSong && (
           <Icon
             name={isPlaying ? "volume-2" : "pause"}
@@ -99,35 +110,35 @@ const TabOneScreen = () => {
             style={styles.playIcon}
           />
         )}
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => handleMenuPress(item)}
-        >
-          <Icon
-            name="more-horizontal"
-            size={20}
-            color="rgba(255, 255, 255, 0.7)"
-          />
-        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Music Library</Text>
+      <Text style={styles.title}>Favorite Songs</Text>
       <View
         style={styles.separator}
         lightColor="#eee"
         darkColor="rgba(255,255,255,0.1)"
       />
-      <FlatList
-        data={songs}
-        renderItem={renderSongItem}
-        keyExtractor={(item) => item.id}
-        style={styles.songList}
-        showsVerticalScrollIndicator={false}
-      />
+      {favoriteSongs.length > 0 ? (
+        <FlatList
+          data={favoriteSongs}
+          renderItem={renderSongItem}
+          keyExtractor={(item) => item.id}
+          style={styles.songList}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Icon name="heart" size={80} color="rgba(128, 128, 128, 0.3)" />
+          <Text style={styles.emptyText}>No favorite songs yet</Text>
+          <Text style={styles.emptySubtext}>
+            Tap the heart icon on songs to add them to your favorites
+          </Text>
+        </View>
+      )}
 
       {/* Three Dots Menu Modal */}
       <Modal
@@ -155,22 +166,10 @@ const TabOneScreen = () => {
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={handleToggleFavorite}
+              onPress={handleRemoveFromFavorites}
             >
-              <Icon
-                name="heart"
-                size={20}
-                color={
-                  selectedSong && isFavorite(selectedSong.id)
-                    ? "#ef4444"
-                    : "#007AFF"
-                }
-              />
-              <Text style={styles.menuItemText}>
-                {selectedSong && isFavorite(selectedSong.id)
-                  ? "Remove from Favorites"
-                  : "Add to Favorites"}
-              </Text>
+              <Icon name="heart" size={20} color="#ef4444" />
+              <Text style={styles.menuItemText}>Remove from Favorites</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -189,7 +188,7 @@ const TabOneScreen = () => {
   );
 };
 
-export default TabOneScreen;
+export default FavoritesScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -247,6 +246,11 @@ const styles = StyleSheet.create({
   duration: {
     fontSize: 14,
     opacity: 0.7,
+    marginRight: 12,
+  },
+  favoriteButton: {
+    padding: 8,
+    marginRight: 8,
   },
   currentSongItem: {
     backgroundColor: "rgba(0, 122, 255, 0.2)",
@@ -259,6 +263,24 @@ const styles = StyleSheet.create({
   },
   playIcon: {
     marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 20,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginTop: 8,
+    textAlign: "center",
   },
   menuButton: {
     padding: 8,
