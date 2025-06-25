@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Slider from "@react-native-community/slider";
 import Icon from "react-native-vector-icons/Feather";
-import { songs, Song } from "../../constants/Songs";
+import { getSongs, Song } from "../../constants/Songs";
 import { useMusicContext } from "@/context/MusicContext";
 import { router } from "expo-router";
 
@@ -26,7 +26,6 @@ const MusicPlayer = () => {
     isPlaying,
     currentTime,
     duration,
-    volume,
     playlist,
     currentIndex,
     isShuffled,
@@ -35,7 +34,6 @@ const MusicPlayer = () => {
     sound,
     setIsPlaying,
     setCurrentTime,
-    setVolume,
     setIsShuffled,
     setRepeatMode,
     playNext,
@@ -50,6 +48,16 @@ const MusicPlayer = () => {
   } = useMusicContext();
 
   const [showUpNext, setShowUpNext] = useState(false);
+  const [fallbackSongs, setFallbackSongs] = useState<Song[]>([]);
+
+  // Load fallback songs
+  useEffect(() => {
+    const loadFallbackSongs = async () => {
+      const songsData = await getSongs();
+      setFallbackSongs(songsData);
+    };
+    loadFallbackSongs();
+  }, []);
 
   // Sync device volume on mount
   useEffect(() => {
@@ -57,25 +65,36 @@ const MusicPlayer = () => {
   }, []);
 
   // Use the current song from context, fallback to first song if none selected
-  const displaySong = currentSong || songs[0];
+  const displaySong = currentSong ||
+    fallbackSongs[0] || {
+      title: "",
+      artist: "",
+      album: "",
+      duration: 0,
+      cover: "",
+      id: "",
+    };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-    if (isPlaying && currentTime < displaySong.duration) {
+    let interval: any;
+    if (isPlaying && displaySong && currentTime < displaySong.duration) {
       interval = setInterval(() => {
         setCurrentTime(Math.min(currentTime + 1, displaySong.duration));
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, currentTime, displaySong.duration]);
+  }, [isPlaying, currentTime, displaySong?.duration]);
 
   interface FormatTime {
     (seconds: number): string;
   }
 
   const formatTime: FormatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    // Ensure seconds is a valid number
+    const validSeconds =
+      isNaN(seconds) || !isFinite(seconds) ? 0 : Math.max(0, seconds);
+    const mins = Math.floor(validSeconds / 60);
+    const secs = Math.floor(validSeconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
@@ -128,18 +147,24 @@ const MusicPlayer = () => {
             <View style={styles.albumSection}>
               <View style={styles.albumArtContainer}>
                 <Image
-                  source={{ uri: displaySong.cover }}
+                  source={{
+                    uri:
+                      displaySong?.cover ||
+                      "https://via.placeholder.com/300x300/6366f1/ffffff?text=No+Cover",
+                  }}
                   style={styles.albumArt}
                   resizeMode="cover"
+                  onError={(error) => console.log("Image load error:", error)}
+                  onLoad={() => console.log("Image loaded successfully")}
                 />
               </View>
             </View>
 
             {/* Song Info */}
             <View style={styles.songInfo}>
-              <Text style={styles.songTitle}>{displaySong.title}</Text>
-              <Text style={styles.artistName}>{displaySong.artist}</Text>
-              <Text style={styles.albumName}>{displaySong.album}</Text>
+              <Text style={styles.songTitle}>{displaySong?.title || ""}</Text>
+              <Text style={styles.artistName}>{displaySong?.artist || ""}</Text>
+              <Text style={styles.albumName}>{displaySong?.album || ""}</Text>
             </View>
           </>
         ) : (
@@ -155,20 +180,24 @@ const MusicPlayer = () => {
           <>
             {/* Progress Section */}
             <View style={styles.progressSection}>
-              {" "}
               <Slider
                 style={styles.progressSlider}
                 minimumValue={0}
-                maximumValue={displaySong.duration}
-                value={currentTime}
+                maximumValue={Math.max(displaySong?.duration || 0, 1)}
+                value={Math.max(
+                  0,
+                  Math.min(currentTime || 0, displaySong?.duration || 0)
+                )}
                 onValueChange={handleSeek}
                 minimumTrackTintColor="#FFFFFF"
                 maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
               />
               <View style={styles.timeContainer}>
-                <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
                 <Text style={styles.timeText}>
-                  {formatTime(displaySong.duration)}
+                  {formatTime(currentTime || 0)}
+                </Text>
+                <Text style={styles.timeText}>
+                  {formatTime(displaySong?.duration || 0)}
                 </Text>
               </View>
             </View>
@@ -187,7 +216,7 @@ const MusicPlayer = () => {
                   size={24}
                   color={isShuffled ? "#10b981" : "rgba(255, 255, 255, 0.7)"}
                 />
-              </TouchableOpacity>{" "}
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.controlButton}
                 onPress={playPrevious}
@@ -256,26 +285,6 @@ const MusicPlayer = () => {
                   }
                 />
               </TouchableOpacity>
-
-              <View style={styles.volumeContainer}>
-                <Icon
-                  name="volume-2"
-                  size={20}
-                  color="rgba(255, 255, 255, 0.7)"
-                />
-                <Slider
-                  style={styles.volumeSlider}
-                  minimumValue={0}
-                  maximumValue={1}
-                  value={volume}
-                  onValueChange={setVolume}
-                  minimumTrackTintColor="#FFFFFF"
-                  maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-                />
-                <Text style={styles.volumeText}>
-                  {Math.round(volume * 100)}
-                </Text>
-              </View>
 
               <TouchableOpacity
                 style={styles.secondaryButton}
@@ -383,6 +392,7 @@ const styles = StyleSheet.create({
     width: width * 0.2,
     height: width * 0.2,
     borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -502,35 +512,12 @@ const styles = StyleSheet.create({
   secondaryControls: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
     paddingBottom: 20,
   },
   secondaryButton: {
     padding: 12,
     borderRadius: 24,
-  },
-  volumeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    maxWidth: 200,
-    marginHorizontal: 16,
-  },
-  volumeSlider: {
-    flex: 1,
-    height: 40,
-    marginHorizontal: 12,
-  },
-  volumeThumb: {
-    backgroundColor: "#FFFFFF",
-    width: 12,
-    height: 12,
-  },
-  volumeText: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 12,
-    width: 24,
-    textAlign: "right",
   },
   // Modal styles
   modalContainer: {

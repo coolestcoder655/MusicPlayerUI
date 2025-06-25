@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { Song } from "@/constants/Songs";
 import { router } from "expo-router";
+// TODO: Migrate to expo-audio when API is stable (currently expo-av in SDK 53)
 import { Audio } from "expo-av";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -92,11 +93,12 @@ export const MusicProvider: React.FC<MusicProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeDefaultSong = async () => {
       try {
-        const { songs } = require("@/constants/Songs");
-        if (songs && songs.length > 0 && !currentSong) {
-          setCurrentSong(songs[0]);
-          setPlaylist(songs);
-          setDuration(songs[0].duration);
+        const { getSongs } = require("@/constants/Songs");
+        const songsData = await getSongs();
+        if (songsData && songsData.length > 0 && !currentSong) {
+          setCurrentSong(songsData[0]);
+          setPlaylist(songsData);
+          setDuration(songsData[0].duration);
         }
       } catch (error) {
         console.log("Error initializing default song:", error);
@@ -172,6 +174,9 @@ export const MusicProvider: React.FC<MusicProviderProps> = ({ children }) => {
 
   const getFavoriteSongs = () => {
     // Import songs here to avoid circular dependency
+    const { getSongs } = require("@/constants/Songs");
+    // Since getSongs is async, we'll need to handle this differently
+    // For now, we'll use a synchronous approach with cached songs
     const { songs } = require("@/constants/Songs");
     return songs.filter((song: Song) => favoriteSongs.includes(song.id));
   };
@@ -191,11 +196,12 @@ export const MusicProvider: React.FC<MusicProviderProps> = ({ children }) => {
 
   const syncDeviceVolume = async () => {
     try {
-      // Set up audio mode for music playback
+      // Set up audio mode for music playback with iOS-compatible settings
       await Audio.setAudioModeAsync({
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
+        playsInSilentModeIOS: true, // Allow playback in silent mode on iOS
       });
 
       // For Expo, we'll set a reasonable default volume

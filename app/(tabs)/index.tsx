@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   FlatList,
@@ -6,15 +6,20 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 
 import EditScreenInfo from "@/components/EditScreenInfo";
 import { Text, View } from "@/components/Themed";
-import { songs, Song } from "@/constants/Songs";
+import { Song } from "@/constants/Songs";
 import { useMusicContext } from "@/context/MusicContext";
+import { useSongs } from "@/Hooks/useSongs";
 
-const TabOneScreen = () => {
+const IndexPage = () => {
+  const router = useRouter();
   const {
     currentSong,
     setPlaylist,
@@ -26,6 +31,7 @@ const TabOneScreen = () => {
     isFavorite,
   } = useMusicContext();
 
+  const { songs, loading, error, refetch } = useSongs();
   const [showMenu, setShowMenu] = useState(false);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
 
@@ -70,6 +76,10 @@ const TabOneScreen = () => {
       );
     }
     setShowMenu(false);
+  };
+
+  const handleAddSong = () => {
+    router.push("/(tabs)/MusicAdder");
   };
 
   const renderSongItem = ({ item, index }: { item: Song; index: number }) => {
@@ -121,13 +131,41 @@ const TabOneScreen = () => {
         lightColor="#eee"
         darkColor="rgba(255,255,255,0.1)"
       />
-      <FlatList
-        data={songs}
-        renderItem={renderSongItem}
-        keyExtractor={(item) => item.id}
-        style={styles.songList}
-        showsVerticalScrollIndicator={false}
-      />
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading songs from database...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle" size={60} color="#ff4444" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={songs}
+          renderItem={renderSongItem}
+          keyExtractor={(item) => item.id}
+          style={styles.songList}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Floating Add Song Button */}
+      <TouchableOpacity style={styles.addButton} onPress={handleAddSong}>
+        <LinearGradient
+          colors={["#ef4444", "#f97316"]} // red to orange gradient
+          style={styles.addButtonGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Icon name="plus" size={24} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Three Dots Menu Modal */}
       <Modal
@@ -189,7 +227,7 @@ const TabOneScreen = () => {
   );
 };
 
-export default TabOneScreen;
+export default IndexPage;
 
 const styles = StyleSheet.create({
   container: {
@@ -207,6 +245,40 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     height: 1,
     width: "80%",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    opacity: 0.7,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#ff4444",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   songList: {
     flex: 1,
@@ -307,5 +379,29 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: "#666",
+  },
+  // Add Song Button styles
+  addButton: {
+    position: "absolute",
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+  },
+  addButtonGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

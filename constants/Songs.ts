@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 export interface Song {
   id: string;
   title: string;
@@ -8,7 +10,55 @@ export interface Song {
   audio?: string; // Optional property for audio URL
 }
 
-export const songs: Song[] = [
+// Cache for songs to avoid repeated database calls
+let songsCache: Song[] | null = null;
+
+// Function to fetch songs from Supabase
+export const fetchSongs = async (): Promise<Song[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('songs') // Make sure this matches your table name
+      .select('*')
+      .order('id');
+
+    if (error) {
+      console.error('Error fetching songs from Supabase:', error);
+      return fallbackSongs; // Return fallback data if there's an error
+    }
+
+    if (data) {
+      // Transform the data to match our Song interface
+      const transformedSongs: Song[] = data.map((song: any) => ({
+        id: song.id.toString(),
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        cover: song.cover,
+        duration: song.duration,
+        audio: song.audio,
+      }));
+      
+      songsCache = transformedSongs;
+      return transformedSongs;
+    }
+
+    return fallbackSongs;
+  } catch (error) {
+    console.error('Error connecting to Supabase:', error);
+    return fallbackSongs;
+  }
+};
+
+// Get cached songs or fetch from database
+export const getSongs = async (): Promise<Song[]> => {
+  if (songsCache) {
+    return songsCache;
+  }
+  return await fetchSongs();
+};
+
+// Fallback songs (your original hard-coded data as backup)
+const fallbackSongs: Song[] = [
   {
     id: "1",
     title: "Blinding Lights",
@@ -55,3 +105,7 @@ export const songs: Song[] = [
     audio: "https://dxlzxcohsmgkrgnacgkf.supabase.co/storage/v1/object/public/music//AntiHero.mp3",
   },
 ];
+
+// Export the fallback songs as 'songs' for backward compatibility
+// But ideally, components should use getSongs() or fetchSongs()
+export const songs = fallbackSongs;
